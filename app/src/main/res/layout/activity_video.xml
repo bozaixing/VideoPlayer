@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <FrameLayout
+        android:id="@+id/video_parent_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <Button
+        android:id="@+id/play_video"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="100dp"
+        android:layout_marginLeft="64dp"
+        android:layout_marginRight="64dp"
+        android:text="播放视频"
+        android:textSize="14sp"
+        android:textColor="@color/colorAccent"
+        android:gravity="center"/>
+
+    <Button
+        android:id="@+id/pause_video"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginLeft="64dp"
+        android:layout_marginRight="64dp"
+        android:text="暂停视频"
+        android:textSize="14sp"
+        android:textColor="@color/colorAccent"
+        android:gravity="center"/>
+
+
+</LinearLayout>
