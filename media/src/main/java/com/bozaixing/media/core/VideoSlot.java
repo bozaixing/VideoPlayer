@@ -1,10 +1,12 @@
 package com.bozaixing.media.core;
 
 import android.content.Context;
+import android.text.TextUtils;
 import android.view.ViewGroup;
+import android.widget.TextView;
 
 import com.bozaixing.media.constant.VideoConstant;
-import com.bozaixing.media.model.VideoModel;
+import com.bozaixing.media.dialog.VideoFullDialog;
 import com.bozaixing.media.widgets.VideoPlayer;
 
 /**
@@ -33,20 +35,28 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
     /**
      * DATA
      */
-    private VideoModel mVideoModel;
+    private String mVideoUrl;
     private VideoSlotListener mVideoSlotListener;
 
+//
+//    /**
+//     * 构造方法，初始化数据
+//     *
+//     * @param videoUrl
+//     * @param listener
+//     */
+//    public VideoSlot(String videoUrl, VideoSlotListener listener){
+//        mVideoUrl = videoUrl;
+//        mVideoSlotListener = listener;
+//        mParentContainer = listener.getParentContainer();
+//        mContext = mParentContainer.getContext();
+//        // 初始化视频播放器对象
+//        initVideoPlayer();
+//    }
 
-    /**
-     * 构造方法，初始化数据
-     *
-     * @param model
-     * @param listener
-     */
-    public VideoSlot(VideoModel model, VideoSlotListener listener){
-        mVideoModel = model;
-        mVideoSlotListener = listener;
-        mParentContainer = listener.getParentContainer();
+    public VideoSlot(String videoUrl, ViewGroup parentContainer){
+        mVideoUrl = videoUrl;
+        mParentContainer = parentContainer;
         mContext = mParentContainer.getContext();
         // 初始化视频播放器对象
         initVideoPlayer();
@@ -58,38 +68,94 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      */
     private void initVideoPlayer(){
         mVideoPlayer = new VideoPlayer(mContext, mParentContainer);
-        if (mVideoModel != null){
-            mVideoPlayer.setDataSource(mVideoModel.getVideoUrl());
+        if (!TextUtils.isEmpty(mVideoUrl)){
+            mVideoPlayer.setDataSource(mVideoUrl);
             mVideoPlayer.setVideoPlayerListener(this);
         }
         // 将播放器控件添加到父容器中
         mParentContainer.addView(mVideoPlayer);
     }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
     @Override
     public void onClickVideo() {
 
     }
+
+
+    /**
+     * 视频全屏播放的方法
+     */
+    @Override
+    public void onClickFullScreen() {
+        // 第一步将视频播放器控件从父容器中移除
+        mParentContainer.removeView(mVideoPlayer);
+        // 第二步创建dialog
+        VideoFullDialog videoFullDialog = new VideoFullDialog(mContext, mVideoPlayer, mVideoPlayer.getCurrentPosition());
+        videoFullDialog.setFullToSmallListener(new VideoFullDialog.FullToSmallListener() {
+
+            /**
+             * 全屏播放时点击返回按钮回调的方法
+             * @param position
+             */
+            @Override
+            public void getCurrentPlayPosition(int position) {
+                // 调用全屏模式返回小屏模式的方法
+                backToSmallMode(position);
+            }
+
+            @Override
+            public void onPlayComplete() {
+
+            }
+        });
+        // 第三步显示dialog
+        videoFullDialog.show();
+    }
+
+
+    /**
+     * 从全屏模式返回小屏模式的方法
+     *
+     * @param position
+     */
+    private void backToSmallMode(int position){
+        // 如果当前播放器控件不为空
+        if (mVideoPlayer != null){
+            // 如果当前播放器没有父容器
+            if (mVideoPlayer.getParent() == null){
+                // 将播放器控件添加到父容器中
+                mParentContainer.addView(mVideoPlayer);
+            }
+            // 重新设置监听
+            mVideoPlayer.setVideoPlayerListener(this);
+            // 跳转到指定位置播放
+            mVideoPlayer.seekAndResume(position);
+        }
+    }
+
+
+    /**
+     * 全屏播放完成返回执行的逻辑
+     */
+    private void fullScreenPlayComplete(){
+        if (mVideoPlayer != null){
+            if (mVideoPlayer.getParent() == null){
+                mParentContainer.addView(mVideoPlayer);
+            }
+            // 重新设置监听
+            mVideoPlayer.setVideoPlayerListener(this);
+            mVideoPlayer.seekAndPause(0);
+        }
+    }
+
+
+
+    @Override
+    public void onClickBack() {
+
+    }
+
+
 
     @Override
     public void onBufferingUpdate(int time) {
@@ -175,11 +241,18 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
     }
 
 
-
-
-
-
-
+    /**
+     * 销毁资源
+     */
+    public void destory(){
+        if (mVideoPlayer != null){
+            mVideoPlayer.destory();
+        }
+        mVideoPlayer = null;
+        mParentContainer.removeAllViews();
+        mParentContainer = null;
+        mContext = null;
+    }
 
 
 

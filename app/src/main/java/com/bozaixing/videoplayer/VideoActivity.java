@@ -1,5 +1,6 @@
 package com.bozaixing.videoplayer;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
@@ -10,6 +11,7 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
+import com.bozaixing.media.core.VideoSlot;
 import com.bozaixing.media.widgets.VideoPlayer;
 
 /*
@@ -18,15 +20,13 @@ import com.bozaixing.media.widgets.VideoPlayer;
  * Email:   654152983@qq.com.
  * Descr:   视频播放页面
  */
-public class VideoActivity extends AppCompatActivity implements View.OnClickListener {
+public class VideoActivity extends AppCompatActivity {
 
     /**
      * UI
      */
-    private FrameLayout mVideoParentContainer;
-    private VideoPlayer mVideoPlayer;
-    private Button mPlayVideo;
-    private Button mPauseVideo;
+    private FrameLayout mParentContainer;
+    private VideoSlot mVideoSlot;
 
 
     /**
@@ -39,47 +39,23 @@ public class VideoActivity extends AppCompatActivity implements View.OnClickList
     }
 
 
+    @SuppressLint("WrongViewCast")
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video);
-        mPlayVideo = findViewById(R.id.play_video);
-        mPauseVideo = findViewById(R.id.pause_video);
-        mPlayVideo.setOnClickListener(this);
-        mPauseVideo.setOnClickListener(this);
-        mVideoParentContainer = findViewById(R.id.video_parent_container);
-        mVideoPlayer = new VideoPlayer(this, mVideoParentContainer);
-        mVideoPlayer.setDataSource("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4");
+        mParentContainer = findViewById(R.id.container_layout);
+        mVideoSlot = new VideoSlot("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4",
+                mParentContainer);
 
-        mVideoParentContainer.addView(mVideoPlayer);
-
-
-    }
-
-    @Override
-    public void onClick(View v) {
-        switch (v.getId()){
-            case R.id.play_video:
-                if (mVideoPlayer != null){
-                    mVideoPlayer.resume();
-                }
-                break;
-            case R.id.pause_video:
-                if (mVideoPlayer != null){
-                    mVideoPlayer.pause();
-                }
-                break;
-                default:
-                    break;
-        }
     }
 
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (mVideoPlayer != null){
-            mVideoPlayer.destory();
+        if (mVideoSlot != null){
+            mVideoSlot.destory();
         }
     }
 }

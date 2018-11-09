@@ -27,6 +27,7 @@ import android.widget.TextView;
 
 import com.bozaixing.media.R;
 import com.bozaixing.media.constant.VideoConstant;
+import com.bozaixing.media.util.VideoUtil;
 
 /*
  * Author:  bozaixing.
@@ -60,24 +61,30 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
     private static final int LOAD_TOTAL_COUNT = 3;
 
 
-
     /**
      * UI
      */
     private ViewGroup mParentContainer;
     private RelativeLayout mPlayerView;
-    private TextureView mVideoView;
+    private TextureView mTextureView;
     private ImageView mThumbView;
     private LinearLayout mLoadingControllerLayout;
     private ProgressBar mLoadingView;
-    private TextView mLoadingText;
+    private TextView mLoadingTextView;
+    private LinearLayout mTopControllerLayout;
+    private ImageView mBackView;
+    private TextView mTitleView;
+    private LinearLayout mBatteryAndTimeLayout;
+    private ImageView mBatteryView;
+    private TextView mTimeView;
     private LinearLayout mBottomControllerLayout;
-    private ImageView mStartView;
+    private ImageView mPlayAndPauseView;
     private TextView mPositionView;
     private TextView mDurationView;
     private SeekBar mSeekBarView;
     private ImageView mFullView;
-
+    private TextView mLengthView;
+    private ImageView mCenterStartView;
 
 
     /**
@@ -98,12 +105,13 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
     private int mCurrentLoadCount;
     // 播放器的默认状态为空闲状态
     private int mCurrentPlayerState = STATE_IDLE;
-
+    // 视频缓冲的百分比
+    private int mBufferingPercent;
 
     /**
      * OBJECT
      */
-    private Surface mVideoSurface;
+    private Surface mSurface;
     private AudioManager mAudioManager;
     private MediaPlayer mMediaPlayer;
     private LockScreenEventReceiver mLockScreenEventReceiver;
@@ -119,16 +127,17 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
                         if (mVideoPlayerListener != null) {
                             mVideoPlayerListener.onBufferingUpdate(getCurrentPosition());
                         }
+                        // 更新播放状态
+                        updatePlayProgress();
+
                         sendEmptyMessageDelayed(TIME_MSG, TIME_INTERVAL);
                     }
                     break;
                 default:
                     break;
             }
-
         }
     };
-
 
     /**
      * 构造方法，初始化数据
@@ -138,11 +147,8 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
      */
     public VideoPlayer(@NonNull Context context, ViewGroup parentContainer) {
         super(context);
-        mParentContainer = parentContainer;
-        mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
-
         // 初始化显示控件
-        init(context);
+        init(context, parentContainer);
 
         // 注册广播接收器
         registerBroadcastReceiver();
@@ -154,7 +160,10 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
      *
      * @param context
      */
-    private void init(Context context) {
+    private void init(Context context, ViewGroup parentContainer) {
+        // 初始化音频管理器
+        mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+
         // 计算控件显示的宽度和高度
         DisplayMetrics displayMetrics = new DisplayMetrics();
         WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
@@ -163,30 +172,133 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         mScreenWidth = displayMetrics.widthPixels;
         mScreenHeight = (int) (mScreenWidth * VideoConstant.VIDEO_HEIGHT_PERCENT);
 
+        mParentContainer = parentContainer;
         mPlayerView = (RelativeLayout) inflate(context, R.layout.media_video_player_layout, this);
-        mVideoView = findViewById(R.id.texture_view);
+        mTextureView = findViewById(R.id.texture_view);
         mThumbView = findViewById(R.id.thumb_view);
         mLoadingControllerLayout = findViewById(R.id.loading_controller_layout);
         mLoadingView = findViewById(R.id.loading_view);
-        mLoadingText = findViewById(R.id.loading_text);
+        mLoadingTextView = findViewById(R.id.loading_text_view);
+        mTopControllerLayout = findViewById(R.id.top_controller_layout);
+        mBackView = findViewById(R.id.back_view);
+        mTitleView = findViewById(R.id.title_view);
+        mBatteryAndTimeLayout = findViewById(R.id.battery_and_time_layout);
+        mBatteryView = findViewById(R.id.battery_view);
+        mTimeView = findViewById(R.id.time_view);
         mBottomControllerLayout = findViewById(R.id.bottom_controller_layout);
-        mStartView = findViewById(R.id.start_view);
+        mPlayAndPauseView = findViewById(R.id.play_and_pause_view);
         mPositionView = findViewById(R.id.position_view);
         mDurationView = findViewById(R.id.duration_view);
         mSeekBarView = findViewById(R.id.seek_bar_view);
         mFullView = findViewById(R.id.full_view);
+        mLengthView = findViewById(R.id.length_view);
+        mCenterStartView = findViewById(R.id.center_start_view);
 
         // 设置播放器的宽度和高度
         LayoutParams params = new LayoutParams(mScreenWidth, mScreenHeight);
         params.addRule(RelativeLayout.CENTER_IN_PARENT);
         mPlayerView.setLayoutParams(params);
 
-        // 保持屏幕常亮
-        mVideoView.setKeepScreenOn(true);
-        mVideoView.setOnClickListener(this);
-        mVideoView.setSurfaceTextureListener(this);
+        // 设置保持屏幕常亮
+        mTextureView.setKeepScreenOn(true);
+        // 注册点击事件
+        mTextureView.setOnClickListener(this);
+        // 注册缓冲的监听事件
+        mTextureView.setSurfaceTextureListener(this);
+
+        mCenterStartView.setOnClickListener(this);
+        mPlayAndPauseView.setOnClickListener(this);
+        mFullView.setOnClickListener(this);
+        mBackView.setOnClickListener(this);
 
     }
+
+
+    /**
+     * 空闲状态的界面显示的View
+     */
+    private void showIdleView(){
+        // 隐藏加载控制器
+        mLoadingControllerLayout.setVisibility(GONE);
+        // 隐藏底部控制器
+        mBottomControllerLayout.setVisibility(GONE);
+        // 显示缩略图
+        mThumbView.setVisibility(VISIBLE);
+        // 显示总时长显示控件
+        mLengthView.setVisibility(VISIBLE);
+        // 显示中间的启动播放按钮
+        mCenterStartView.setVisibility(VISIBLE);
+    }
+
+
+    /**
+     * 加载状态时界面显示的View
+     */
+    private void showLoadingView(){
+        // 隐藏缩略图
+        mThumbView.setVisibility(GONE);
+        // 隐藏底部控制器
+        mBottomControllerLayout.setVisibility(GONE);
+        // 隐藏总时长显示控件
+        mLengthView.setVisibility(GONE);
+        // 隐藏中间的启动播放按钮
+        mCenterStartView.setVisibility(GONE);
+        // 显示加载控制器
+        mLoadingControllerLayout.setVisibility(VISIBLE);
+    }
+
+    /**
+     * 播放状态时界面显示的View
+     */
+    private void showPlayView(){
+        // 隐藏缩略图
+        mThumbView.setVisibility(GONE);
+        // 隐藏加载控制器
+        mLoadingControllerLayout.setVisibility(GONE);
+        // 隐藏总时长显示控件
+        mLengthView.setVisibility(GONE);
+        // 隐藏中间的启动播放按钮
+        mCenterStartView.setVisibility(GONE);
+        // 显示底部控制器
+        mBottomControllerLayout.setVisibility(VISIBLE);
+        // 设置播放暂停按钮为播放状态
+        mPlayAndPauseView.setImageResource(R.drawable.ic_player_pause);
+    }
+
+
+    /**
+     * 暂停状态时界面显示的View
+     */
+    private void showPauseView(){
+        // 隐藏缩略图
+        mThumbView.setVisibility(GONE);
+        // 隐藏加载控制器
+        mLoadingControllerLayout.setVisibility(GONE);
+        // 隐藏总时长显示控件
+        mLengthView.setVisibility(GONE);
+        // 隐藏中间的启动按钮
+        mCenterStartView.setVisibility(GONE);
+        // 显示底部控制器
+        mBottomControllerLayout.setVisibility(VISIBLE);
+        // 设置播放暂停按钮为暂停状态
+        mPlayAndPauseView.setImageResource(R.drawable.ic_player_start);
+    }
+
+
+    /**
+     * 更新播放进度
+     */
+    private void updatePlayProgress(){
+        int currentPosition = getCurrentPosition();
+        int duration = getDuration();
+        int progress = currentPosition / duration * 100;
+        int bufferingPercent = getBufferingPercent();
+        mPositionView.setText(VideoUtil.formatTime(currentPosition));
+        mDurationView.setText(VideoUtil.formatTime(duration));
+        mSeekBarView.setSecondaryProgress(bufferingPercent);
+        mSeekBarView.setProgress(progress);
+    }
+
 
 
     /**
@@ -327,7 +439,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         if (mMediaPlayer != null && mMediaPlayer.isPlaying()) {
             return true;
         }
-
         return false;
     }
 
@@ -359,6 +470,17 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
 
 
     /**
+     * 返回视频缓冲的百分比
+     *
+     * @return
+     */
+    private int getBufferingPercent(){
+
+        return mBufferingPercent;
+    }
+
+
+    /**
      * 进入播放状态时的状态更新
      */
     private void entryResumeUpdateState() {
@@ -367,6 +489,9 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         setIsRealPause(false);
         setIsComplete(false);
     }
+
+
+
 
 
     /**
@@ -378,6 +503,8 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
             mMediaPlayer = createMediaPlayer();
         }
     }
+
+
 
 
     /**
@@ -396,14 +523,14 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         mMediaPlayer.setOnCompletionListener(this);
         // 注册一个回调监听，在有警告或错误信息时调用。例如：开始缓冲、缓冲结束、下载速度变化
         mMediaPlayer.setOnInfoListener(this);
-        if (mVideoSurface != null && mVideoSurface.isValid()) {
-            mMediaPlayer.setSurface(mVideoSurface);
+        if (mSurface != null && mSurface.isValid()) {
+            mMediaPlayer.setSurface(mSurface);
         } else {
             stop();
         }
-
         return mMediaPlayer;
     }
+
 
 
     /**
@@ -415,7 +542,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         if (getCurrentPlayerState() != STATE_IDLE) {
             return;
         }
-
+        showLoadingView();
         try {
             // 开始进行视频的加载
             setCurrentPlayerState(STATE_IDLE);
@@ -426,6 +553,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
             // 设置音量
             setVolume();
         } catch (Exception e) {
+            e.printStackTrace();
             Log.e(TAG, e.getMessage());
             // 视频加载出现错误后重新加载视频
             stop();
@@ -452,6 +580,11 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
             mMediaPlayer.start();
             // 发送消息
             mHandler.sendEmptyMessage(TIME_MSG);
+            // 显示播放状态的界面
+            showPlayView();
+        }else {
+            // 显示暂停状态的界面
+            showPauseView();
         }
 
     }
@@ -496,6 +629,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
                 mMediaPlayer.seekTo(0);
             }
         }
+        showPauseView();
         // 移除消息
         mHandler.removeCallbacksAndMessages(null);
     }
@@ -567,6 +701,8 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         if (mCurrentLoadCount < LOAD_TOTAL_COUNT) {
             mCurrentLoadCount++;
             load();
+        }else {
+            showPauseView();
         }
     }
 
@@ -624,6 +760,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
             mMediaPlayer.reset();
         }
         if (mCurrentLoadCount >= LOAD_TOTAL_COUNT) {
+            showPauseView();
             // 回调加载视频失败的方法
             if (mVideoPlayerListener != null) {
                 mVideoPlayerListener.onVideoLoadFailed();
@@ -649,7 +786,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         return true;
     }
 
-
     /**
      * 视频播放器视频播放完成时的回调方法
      *
@@ -664,14 +800,41 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         // 设置播放器回到初始状态
         playBack();
 
+
     }
 
 
+    /**
+     * 点击事件的回调方法
+     *
+     * @param v
+     */
     @Override
     public void onClick(View v) {
-
+        if (v == mCenterStartView){   // 中间的播放按钮
+            // 如果为空闲状态
+            if (getCurrentPlayerState() == STATE_PAUSING){
+                resume();
+            }else {
+                load();
+            }
+        }else if (v == mPlayAndPauseView){      // 播放暂停按钮
+            // 如果为播放状态
+            if (getCurrentPlayerState() == STATE_PLAYING){
+                pause();
+            }else {
+                resume();
+            }
+        }else if (v == mFullView){      // 全屏播放按钮
+            if (mVideoPlayerListener != null){
+                mVideoPlayerListener.onClickFullScreen();
+            }
+        }else if (v == mBackView){      // 返回按钮
+            if (mVideoPlayerListener != null){
+                mVideoPlayerListener.onClickBack();
+            }
+        }
     }
-
 
     /**
      * 播放器控件显示状态发生改变的回调方法
@@ -703,9 +866,11 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
      */
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-        mVideoSurface = new Surface(surfaceTexture);
-        // 加载视频
-        load();
+        if (mSurface == null){
+            mSurface = new Surface(surfaceTexture);
+        }
+        // 检查并创建MediaPlayer
+        checkMediaPlayer();
 
     }
 
@@ -835,7 +1000,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
     public interface VideoPlayerListener {
 
         /**
-         * 返回当前视频的缓冲进度
+         * 返回当前视频的缓冲进度(视频播放到了第几秒)
          *
          * @param time
          */
@@ -864,6 +1029,18 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
          * 点击视频界面的回调方法
          */
         void onClickVideo();
+
+
+        /**
+         * 视频全屏播放的回调方法
+         */
+        void onClickFullScreen();
+
+
+        /**
+         * 全屏播放点击返回时的回调方法
+         */
+        void onClickBack();
 
     }
 
