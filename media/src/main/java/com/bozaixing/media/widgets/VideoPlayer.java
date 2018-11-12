@@ -11,13 +11,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.support.annotation.NonNull;
-import android.util.DisplayMetrics;
+import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
-import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -26,7 +24,6 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 
 import com.bozaixing.media.R;
-import com.bozaixing.media.constant.VideoConstant;
 import com.bozaixing.media.util.VideoUtil;
 
 /*
@@ -41,7 +38,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         MediaPlayer.OnCompletionListener,
         MediaPlayer.OnErrorListener,
         MediaPlayer.OnInfoListener,
-        MediaPlayer.OnPreparedListener {
+        MediaPlayer.OnPreparedListener, SeekBar.OnSeekBarChangeListener {
 
     /**
      * TAG
@@ -64,8 +61,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
     /**
      * UI
      */
-    private ViewGroup mParentContainer;
-    private RelativeLayout mPlayerView;
     private TextureView mTextureView;
     private ImageView mThumbView;
     private LinearLayout mLoadingControllerLayout;
@@ -91,8 +86,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
      * DATA
      */
     private String mVideoUrl;
-    private int mScreenWidth;
-    private int mScreenHeight;
 
 
     /**
@@ -143,37 +136,35 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
      * 构造方法，初始化数据
      *
      * @param context
-     * @param parentContainer
      */
-    public VideoPlayer(@NonNull Context context, ViewGroup parentContainer) {
-        super(context);
+    public VideoPlayer(@NonNull Context context) {
+        this(context, null);
+    }
+
+
+    public VideoPlayer(Context context, AttributeSet attrs) {
+        this(context, attrs, 0);
+    }
+
+    public VideoPlayer(Context context, AttributeSet attrs, int defStyleAttr) {
+        super(context, attrs, defStyleAttr);
         // 初始化显示控件
-        init(context, parentContainer);
+        init(context);
 
         // 注册广播接收器
         registerBroadcastReceiver();
     }
-
 
     /**
      * 初始化显示控件
      *
      * @param context
      */
-    private void init(Context context, ViewGroup parentContainer) {
+    private void init(Context context) {
         // 初始化音频管理器
         mAudioManager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
 
-        // 计算控件显示的宽度和高度
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-        windowManager.getDefaultDisplay().getMetrics(displayMetrics);
-        // 宽高比为16:9
-        mScreenWidth = displayMetrics.widthPixels;
-        mScreenHeight = (int) (mScreenWidth * VideoConstant.VIDEO_HEIGHT_PERCENT);
-
-        mParentContainer = parentContainer;
-        mPlayerView = (RelativeLayout) inflate(context, R.layout.media_video_player_layout, this);
+        inflate(context, R.layout.media_video_player_layout, this);
         mTextureView = findViewById(R.id.texture_view);
         mThumbView = findViewById(R.id.thumb_view);
         mLoadingControllerLayout = findViewById(R.id.loading_controller_layout);
@@ -194,11 +185,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         mLengthView = findViewById(R.id.length_view);
         mCenterStartView = findViewById(R.id.center_start_view);
 
-        // 设置播放器的宽度和高度
-        LayoutParams params = new LayoutParams(mScreenWidth, mScreenHeight);
-        params.addRule(RelativeLayout.CENTER_IN_PARENT);
-        mPlayerView.setLayoutParams(params);
-
         // 设置保持屏幕常亮
         mTextureView.setKeepScreenOn(true);
         // 注册点击事件
@@ -208,6 +194,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
 
         mCenterStartView.setOnClickListener(this);
         mPlayAndPauseView.setOnClickListener(this);
+        mSeekBarView.setOnSeekBarChangeListener(this);
         mFullView.setOnClickListener(this);
         mBackView.setOnClickListener(this);
 
@@ -292,10 +279,8 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         int currentPosition = getCurrentPosition();
         int duration = getDuration();
         int progress = currentPosition / duration * 100;
-        int bufferingPercent = getBufferingPercent();
         mPositionView.setText(VideoUtil.formatTime(currentPosition));
         mDurationView.setText(VideoUtil.formatTime(duration));
-        mSeekBarView.setSecondaryProgress(bufferingPercent);
         mSeekBarView.setProgress(progress);
     }
 
@@ -489,8 +474,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         setIsRealPause(false);
         setIsComplete(false);
     }
-
-
 
 
 
@@ -800,7 +783,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         // 设置播放器回到初始状态
         playBack();
 
-
     }
 
 
@@ -814,6 +796,7 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         if (v == mCenterStartView){   // 中间的播放按钮
             // 如果为空闲状态
             if (getCurrentPlayerState() == STATE_PAUSING){
+                setCurrentPlayerState(STATE_PAUSING);
                 resume();
             }else {
                 load();
@@ -866,12 +849,10 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
      */
     @Override
     public void onSurfaceTextureAvailable(SurfaceTexture surfaceTexture, int width, int height) {
-        if (mSurface == null){
-            mSurface = new Surface(surfaceTexture);
-        }
-        // 检查并创建MediaPlayer
+        mSurface = new Surface(surfaceTexture);
         checkMediaPlayer();
-
+        mMediaPlayer.setSurface(mSurface);
+//        load();
     }
 
     @Override
@@ -908,10 +889,8 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
         setIsRealPause(false);
         setIsComplete(false);
         setIsCanPlay(false);
-
         // 移除广播接收器的监听
         unregisterBroadcastReceiver();
-
         // 移除消息
         mHandler.removeCallbacksAndMessages(null);
     }
@@ -932,7 +911,6 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
             if (getContext() != null) {
                 getContext().registerReceiver(mLockScreenEventReceiver, filter);
             }
-
         }
     }
 
@@ -957,6 +935,8 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
     public void setVideoPlayerListener(VideoPlayerListener listener) {
         mVideoPlayerListener = listener;
     }
+
+
 
 
     /**
@@ -991,6 +971,23 @@ public class VideoPlayer extends RelativeLayout implements View.OnClickListener,
             }
 
         }
+    }
+
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
+        int position = getDuration() * seekBar.getProgress() / 100;
+        mSeekBarView.setProgress(seekBar.getProgress());
+        seekAndResume(position);
     }
 
 

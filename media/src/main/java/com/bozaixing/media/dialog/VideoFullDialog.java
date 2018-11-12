@@ -1,5 +1,6 @@
 package com.bozaixing.media.dialog;
 
+import android.annotation.TargetApi;
 import android.app.Dialog;
 import android.content.Context;
 import android.os.Build;
@@ -9,8 +10,10 @@ import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.animation.LinearInterpolator;
 
 import com.bozaixing.media.R;
+import com.bozaixing.media.util.VideoUtil;
 import com.bozaixing.media.widgets.VideoPlayer;
 
 /**
@@ -39,7 +42,10 @@ public class VideoFullDialog extends Dialog implements VideoPlayer.VideoPlayerLi
     private int mPosition;
     private boolean mIsFirstCreateDialog = true;
     private FullToSmallListener mFullToSmallListener;
-
+    private Bundle mStartBundle;
+    private Bundle mEndBundle;
+    // 出入场动画要执行的平移值
+    private int mDeltaY;
 
     /**
      * 构造方法，初始化数据
@@ -98,9 +104,17 @@ public class VideoFullDialog extends Dialog implements VideoPlayer.VideoPlayerLi
                 // 第一步先移除监听
                 mParentContainer.getViewTreeObserver().removeOnPreDrawListener(this);
                 // 准备动画需要的数据
+                prepareScene();
+                // 运行动画
+                runEnterAnim();
                 return false;
             }
         });
+    }
+
+
+    public void setViewBundle(Bundle bundle){
+        mStartBundle = bundle;
     }
 
 
@@ -108,9 +122,51 @@ public class VideoFullDialog extends Dialog implements VideoPlayer.VideoPlayerLi
      * 准备动画
      */
     private void prepareScene(){
+        if (mVideoPlayer != null){
+            mEndBundle = VideoUtil.getViewProperty(mVideoPlayer);
+            mDeltaY = mStartBundle.getInt(VideoUtil.VIEW_SCREEN_LOCATION_TOP)
+                    - mEndBundle.getInt(VideoUtil.VIEW_SCREEN_LOCATION_TOP);
+            mVideoPlayer.setTranslationY(mDeltaY);
+        }
+    }
 
 
+    /**
+     * 准备入场动画
+     */
+    private void runEnterAnim(){
+        mVideoPlayer.animate()
+                .setDuration(200)
+                .setInterpolator(new LinearInterpolator())
+                .translationY(0)
+                .start();
 
+    }
+
+
+    /**
+     * 运行出场动画
+     */
+    @TargetApi(Build.VERSION_CODES.JELLY_BEAN)
+    private void runExitAnim(){
+        mVideoPlayer.animate()
+                .setDuration(200)
+                .setInterpolator(new LinearInterpolator())
+                .translationY(mDeltaY)
+                .withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        // 第一步关闭当前的dialog
+                        dismiss();
+                        // 第二步通知逻辑层当前的播放位置
+                        if (mFullToSmallListener != null){
+                            if (mVideoPlayer != null){
+                                mFullToSmallListener.getCurrentPlayPosition(mVideoPlayer.getCurrentPosition());
+                            }
+                        }
+                    }
+                })
+                .start();
     }
 
 
@@ -150,14 +206,15 @@ public class VideoFullDialog extends Dialog implements VideoPlayer.VideoPlayerLi
      */
     @Override
     public void onClickBack() {
-        // 第一步关闭当前的dialog
-        dismiss();
-        // 第二步通知逻辑层当前的播放位置
-        if (mFullToSmallListener != null){
-            if (mVideoPlayer != null){
-                mFullToSmallListener.getCurrentPlayPosition(mVideoPlayer.getCurrentPosition());
-            }
-        }
+//        // 第一步关闭当前的dialog
+//        dismiss();
+//        // 第二步通知逻辑层当前的播放位置
+//        if (mFullToSmallListener != null){
+//            if (mVideoPlayer != null){
+//                mFullToSmallListener.getCurrentPlayPosition(mVideoPlayer.getCurrentPosition());
+//            }
+//        }
+        runExitAnim();
     }
 
 

@@ -1,5 +1,8 @@
 package com.bozaixing.media.util;
 
+import android.os.Bundle;
+import android.view.View;
+
 import java.util.Formatter;
 import java.util.Locale;
 
@@ -50,6 +53,29 @@ public class VideoUtil {
         }
     }
 
+
+
+    /**
+     * 获取View的屏幕属性
+     *
+     * @param view
+     * @return
+     */
+    public static final String VIEW_SCREEN_LOCATION_LEFT = "view_screen_location_left";
+    public static final String VIEW_SCREEN_LOCATION_TOP = "view_screen_location_top";
+    public static final String VIEW_WIDTH = "view_width";
+    public static final String VIEW_HEIGHT = "view_height";
+    public static Bundle getViewProperty(View view){
+        Bundle bundle = new Bundle();
+        int[] screenLocation = new int[2];
+        // 获取View在整个屏幕中的位置
+        view.getLocationOnScreen(screenLocation);
+        bundle.putInt(VIEW_SCREEN_LOCATION_LEFT, screenLocation[0]);
+        bundle.putInt(VIEW_SCREEN_LOCATION_TOP, screenLocation[1]);
+        bundle.putInt(VIEW_WIDTH, view.getWidth());
+        bundle.putInt(VIEW_HEIGHT, view.getHeight());
+        return bundle;
+    }
 
 
 

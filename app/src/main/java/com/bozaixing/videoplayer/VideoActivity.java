@@ -25,7 +25,7 @@ public class VideoActivity extends AppCompatActivity {
     /**
      * UI
      */
-    private FrameLayout mParentContainer;
+    private VideoPlayer mVideoPlayer;
     private VideoSlot mVideoSlot;
 
 
@@ -44,18 +44,54 @@ public class VideoActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video);
-        mParentContainer = findViewById(R.id.container_layout);
-        mVideoSlot = new VideoSlot("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4",
-                mParentContainer);
+        mVideoPlayer = findViewById(R.id.video_player);
+        mVideoPlayer.setDataSource("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4");
+//        mVideoSlot = new VideoSlot("http://tanzi27niu.cdsb.mobi/wps/wp-content/uploads/2017/05/2017-05-17_17-33-30.mp4",
+//                mParentContainer);
+        mVideoPlayer.setVideoPlayerListener(new VideoPlayer.VideoPlayerListener() {
+            @Override
+            public void onBufferingUpdate(int time) {
 
+            }
+
+            @Override
+            public void onVideoLoadSuccess() {
+
+            }
+
+            @Override
+            public void onVideoLoadFailed() {
+
+            }
+
+            @Override
+            public void onVideoLoadComplete() {
+
+            }
+
+            @Override
+            public void onClickVideo() {
+
+            }
+
+            @Override
+            public void onClickFullScreen() {
+
+            }
+
+            @Override
+            public void onClickBack() {
+                finish();
+            }
+        });
     }
 
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (mVideoSlot != null){
-            mVideoSlot.destory();
+        if (mVideoPlayer != null){
+            mVideoPlayer.destory();
         }
     }
 }

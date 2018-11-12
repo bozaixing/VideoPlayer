@@ -1,12 +1,14 @@
 package com.bozaixing.media.core;
 
 import android.content.Context;
+import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.bozaixing.media.constant.VideoConstant;
 import com.bozaixing.media.dialog.VideoFullDialog;
+import com.bozaixing.media.util.VideoUtil;
 import com.bozaixing.media.widgets.VideoPlayer;
 
 /**
@@ -26,7 +28,6 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
     /**
      * UI
      */
-
     private VideoPlayer mVideoPlayer;
     // 视频播放器控件VideoPlayer需要添加到的父容器
     private ViewGroup mParentContainer;
@@ -36,24 +37,14 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      * DATA
      */
     private String mVideoUrl;
-    private VideoSlotListener mVideoSlotListener;
 
-//
-//    /**
-//     * 构造方法，初始化数据
-//     *
-//     * @param videoUrl
-//     * @param listener
-//     */
-//    public VideoSlot(String videoUrl, VideoSlotListener listener){
-//        mVideoUrl = videoUrl;
-//        mVideoSlotListener = listener;
-//        mParentContainer = listener.getParentContainer();
-//        mContext = mParentContainer.getContext();
-//        // 初始化视频播放器对象
-//        initVideoPlayer();
-//    }
 
+    /**
+     * 构造方法，初始化参数
+     *
+     * @param videoUrl
+     * @param parentContainer
+     */
     public VideoSlot(String videoUrl, ViewGroup parentContainer){
         mVideoUrl = videoUrl;
         mParentContainer = parentContainer;
@@ -67,7 +58,7 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      * 初始化视频播放器控件
      */
     private void initVideoPlayer(){
-        mVideoPlayer = new VideoPlayer(mContext, mParentContainer);
+        mVideoPlayer = new VideoPlayer(mContext);
         if (!TextUtils.isEmpty(mVideoUrl)){
             mVideoPlayer.setDataSource(mVideoUrl);
             mVideoPlayer.setVideoPlayerListener(this);
@@ -87,6 +78,8 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      */
     @Override
     public void onClickFullScreen() {
+        // 获取属性值
+        Bundle bundle = VideoUtil.getViewProperty(mParentContainer);
         // 第一步将视频播放器控件从父容器中移除
         mParentContainer.removeView(mVideoPlayer);
         // 第二步创建dialog
@@ -167,9 +160,6 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      */
     @Override
     public void onVideoLoadSuccess() {
-        if (mVideoSlotListener != null){
-            mVideoSlotListener.onVideoLoadSuccess();
-        }
     }
 
 
@@ -178,9 +168,7 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      */
     @Override
     public void onVideoLoadFailed() {
-        if (mVideoSlotListener != null){
-            mVideoSlotListener.onVideoLoadFailed();
-        }
+
     }
 
 
@@ -189,9 +177,7 @@ public class VideoSlot implements VideoPlayer.VideoPlayerListener {
      */
     @Override
     public void onVideoLoadComplete() {
-        if (mVideoSlotListener != null){
-            mVideoSlotListener.onVideoLoadComplete();
-        }
+
     }
 
 
